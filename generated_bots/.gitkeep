@@ -1,0 +1,2 @@
+# This file ensures the generated_bots directory is tracked by git
+# Generated bot files will be saved here at runtime
