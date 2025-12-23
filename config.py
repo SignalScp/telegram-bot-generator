@@ -10,17 +10,16 @@ class Config:
     # Telegram
     MAIN_BOT_TOKEN: str = os.getenv('MAIN_BOT_TOKEN', '')
     
-    # OnlySq API
-    ONLYSQ_API_KEY: str = os.getenv('ONLYSQ_API_KEY', '')
+    # OnlySq API (no key needed - using free tier)
     ONLYSQ_BASE_URL: str = os.getenv('ONLYSQ_BASE_URL', 'https://api.onlysq.ru/v1')
-    ONLYSQ_MODEL: str = os.getenv('ONLYSQ_MODEL', 'gpt-4o')
+    ONLYSQ_MODEL: str = os.getenv('ONLYSQ_MODEL', 'gpt-4o-mini')
     
     # Bot Execution
     BOT_PORT: int = int(os.getenv('BOT_PORT', 8000))
     BOT_WEBHOOK_URL: Optional[str] = os.getenv('BOT_WEBHOOK_URL')
     
-    # Database
-    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///bots.db')
+    # Database (JSON)
+    DATABASE_FILE: str = os.getenv('DATABASE_FILE', 'bots_database.json')
     
     # Logging
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
@@ -38,8 +37,6 @@ class Config:
         """Validate configuration"""
         if not cls.MAIN_BOT_TOKEN:
             raise ValueError('MAIN_BOT_TOKEN is required')
-        if not cls.ONLYSQ_API_KEY:
-            raise ValueError('ONLYSQ_API_KEY is required')
         return True
 
 config = Config()
