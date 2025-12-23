@@ -13,6 +13,7 @@ from telegram.ext import (
 from config import config
 from bot_generator import BotGenerator
 from bot_executor import BotExecutor
+from database import db
 
 # Setup logging
 logging.basicConfig(
@@ -37,6 +38,8 @@ class GeneratorBot:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user = update.effective_user
+        user_id = user.id
+        
         welcome_text = (
             f"🤖 Welcome to Telegram Bot Generator, {user.first_name}!\n\n"
             "I can help you create custom Telegram bots using AI. "
@@ -46,7 +49,8 @@ class GeneratorBot:
             "/list - Show running bots\n"
             "/status - Check bot statuses\n"
             "/stop - Stop a bot\n"
-            "/help - Show help"
+            "/help - Show help\n"
+            "/stats - Show database statistics"
         )
         await update.message.reply_text(welcome_text)
     
@@ -60,6 +64,8 @@ class GeneratorBot:
             "/list - List all bots\n"
             "/status - Show detailed status\n"
             "/stop <bot_name> - Stop a specific bot\n\n"
+            "Database:\n"
+            "/stats - Show statistics\n\n"
             "Tips:\n"
             "• Describe your bot clearly and specifically\n"
             "• Include desired features in the description\n"
@@ -119,6 +125,7 @@ class GeneratorBot:
             # Generate bot code
             bot_code, bot_class_name, bot_name = await generator.generate_bot(
                 description=description,
+                user_id=user_id,
                 enhanced=True
             )
             
@@ -130,6 +137,18 @@ class GeneratorBot:
             
             with open(bot_file, 'w', encoding='utf-8') as f:
                 f.write(bot_code)
+            
+            # Save to database
+            bot_data = {
+                "bot_id": bot_id,
+                "name": bot_name,
+                "description": description,
+                "user_id": user_id,
+                "status": "generated",
+                "code_file": bot_file,
+                "code_length": len(bot_code)
+            }
+            db.add_bot(bot_id, bot_data)
             
             # Store session info
             self.user_sessions[user_id]["bot_code"] = bot_code
@@ -145,6 +164,7 @@ class GeneratorBot:
             preview_text = (
                 f"✅ Bot code generated successfully!\n\n"
                 f"Bot Name: {bot_name}\n"
+                f"Bot ID: {bot_id}\n"
                 f"Code Length: {len(bot_code)} characters\n\n"
                 f"Code Preview:\n"
                 f"```python\n{code_preview}\n```"
@@ -152,6 +172,7 @@ class GeneratorBot:
             
             keyboard = [
                 [InlineKeyboardButton("✅ Launch Bot", callback_data=f"launch_{bot_id}")],
+                [InlineKeyboardButton("📄 Save for Later", callback_data=f"save_{bot_id}")],
                 [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -174,6 +195,22 @@ class GeneratorBot:
         
         if query.data == "cancel":
             await query.edit_message_text("❌ Bot generation cancelled.")
+            return ConversationHandler.END
+        
+        elif query.data.startswith("save_"):
+            bot_id = query.data.replace("save_", "")
+            session = self.user_sessions.get(user_id)
+            
+            if session and session.get("bot_id") == bot_id:
+                # Update bot status in database
+                db.update_bot(bot_id, {"status": "saved"})
+                await query.edit_message_text(
+                    f"📄 Bot '{session['bot_name']}' saved!\n"
+                    f"You can launch it later with /list and /stop commands."
+                )
+            else:
+                await query.edit_message_text("❌ Session expired.")
+            
             return ConversationHandler.END
         
         elif query.data.startswith("launch_"):
@@ -202,10 +239,14 @@ class GeneratorBot:
                     bot_id=bot_id
                 )
                 
+                # Update database
+                db.update_bot(bot_id, {"status": "running", "process_id": bot_process.process.pid})
+                
                 success_text = (
                     f"✅ Bot '{session['bot_name']}' launched successfully!\n\n"
                     f"Bot ID: {bot_id}\n"
                     f"Status: {bot_process.status}\n"
+                    f"Process ID: {bot_process.process.pid}\n"
                     f"Created: {bot_process.created_at}\n\n"
                     f"💡 Next steps:\n"
                     f"1. Replace the token placeholder in the bot code\n"
@@ -221,60 +262,96 @@ class GeneratorBot:
                 error_text = f"❌ Error launching bot:\n{str(e)}"
                 await query.edit_message_text(error_text)
                 logger.error(f"Error launching bot: {e}")
+                # Update database with error
+                db.update_bot(bot_id, {"status": "error", "error": str(e)})
             
             return ConversationHandler.END
     
     async def list_bots(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """List all running bots"""
+        user_id = update.effective_user.id
         bots = executor.list_running_bots()
+        user_bots = db.get_bots_by_user(user_id)
         
-        if not bots:
+        if not user_bots:
             await update.message.reply_text(
-                "📭 No running bots.\n"
+                "📭 No bots created yet.\n"
                 "Use /generate to create a new bot!"
             )
             return
         
-        text = "📋 Running Bots:\n\n"
-        for bot in bots:
+        text = f"📋 Your Bots ({len(user_bots)} total):\n\n"
+        for bot_id, bot_data in user_bots.items():
+            status = bot_data.get("status", "unknown")
+            status_emoji = {
+                "running": "🟢",
+                "stopped": "🔴",
+                "error": "❌",
+                "saved": "📄",
+                "generated": "🔨"
+            }.get(status, "❓")
+            
             text += (
-                f"• {bot['name']} (ID: {bot['bot_id'][:8]})\n"
-                f"  Status: {bot['status']}\n"
-                f"  Started: {bot['started_at']}\n\n"
+                f"{status_emoji} {bot_data.get('name', 'Unknown')}\n"
+                f"   ID: {bot_id}\n"
+                f"   Status: {status}\n\n"
             )
         
         await update.message.reply_text(text)
     
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show all bots status"""
-        bots = executor.list_bots()
+        user_id = update.effective_user.id
+        user_bots = db.get_bots_by_user(user_id)
         
-        if not bots:
+        if not user_bots:
             await update.message.reply_text(
                 "📭 No bots created yet.\n"
                 "Use /generate to create one!"
             )
             return
         
-        text = "📊 All Bots Status:\n\n"
-        for bot in bots:
+        text = "📊 All Your Bots Status:\n\n"
+        for bot_id, bot_data in user_bots.items():
             status_emoji = {
                 "running": "🟢",
                 "stopped": "🔴",
                 "error": "❌",
-                "pending": "⏳"
-            }.get(bot['status'], "❓")
+                "saved": "📄",
+                "generated": "🔨"
+            }.get(bot_data.get("status"), "❓")
             
             text += (
-                f"{status_emoji} {bot['name']}\n"
-                f"   ID: {bot['bot_id']}\n"
-                f"   Status: {bot['status']}\n"
+                f"{status_emoji} {bot_data.get('name', 'Unknown')}\n"
+                f"   ID: {bot_id}\n"
+                f"   Status: {bot_data.get('status', 'unknown')}\n"
+                f"   Created: {bot_data.get('created_at', 'N/A')}\n"
             )
             
-            if bot['error_message']:
-                text += f"   Error: {bot['error_message']}\n"
+            if bot_data.get('error'):
+                text += f"   Error: {bot_data['error']}\n"
             
             text += "\n"
+        
+        await update.message.reply_text(text)
+    
+    async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show database statistics"""
+        stats = db.get_statistics()
+        user_id = update.effective_user.id
+        user_bots = len(db.get_bots_by_user(user_id))
+        
+        text = (
+            "📈 Database Statistics\n\n"
+            f"Total bots: {stats.get('total_bots', 0)}\n"
+            f"Your bots: {user_bots}\n"
+            f"Database file: {stats.get('database_file', 'N/A')}\n"
+            f"Database size: {stats.get('database_size_bytes', 0)} bytes\n\n"
+            f"Bots by status:\n"
+        )
+        
+        for status, count in stats.get('bots_by_status', {}).items():
+            text += f"  {status}: {count}\n"
         
         await update.message.reply_text(text)
     
@@ -303,6 +380,8 @@ class GeneratorBot:
             return
         
         if executor.stop_bot(bot_to_stop):
+            # Update database
+            db.update_bot(bot_to_stop, {"status": "stopped"})
             await update.message.reply_text(
                 f"✅ Bot '{bot_name}' stopped successfully."
             )
@@ -318,6 +397,7 @@ async def main():
         config.validate()
         
         logger.info("Starting Telegram Bot Generator...")
+        logger.info(f"Database file: {config.DATABASE_FILE}")
         
         # Create application
         app = Application.builder().token(config.MAIN_BOT_TOKEN).build()
@@ -329,6 +409,7 @@ async def main():
         app.add_handler(CommandHandler("help", bot_instance.help_command))
         app.add_handler(CommandHandler("list", bot_instance.list_bots))
         app.add_handler(CommandHandler("status", bot_instance.status_command))
+        app.add_handler(CommandHandler("stats", bot_instance.stats_command))
         app.add_handler(CommandHandler("stop", bot_instance.stop_command))
         
         # Conversation handler for bot generation
