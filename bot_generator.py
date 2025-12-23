@@ -6,6 +6,7 @@ from typing import Tuple, Optional
 from onlysq_client import OnlySqClient
 from bot_templates import get_template
 from config import config
+from database import db
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +20,20 @@ class BotGenerator:
         self,
         description: str,
         bot_name: Optional[str] = None,
+        user_id: Optional[int] = None,
         enhanced: bool = True
     ) -> Tuple[str, str, str]:
         """
         Generate bot code from description
         
+        Args:
+            description: Bot description
+            bot_name: Optional custom bot name
+            user_id: User ID for database tracking
+            enhanced: Use enhanced template
+        
         Returns:
-            Tuple of (bot_code, bot_class_name, bot_token_placeholder)
+            Tuple of (bot_code, bot_class_name, bot_name)
         """
         try:
             # Generate bot class name from description
