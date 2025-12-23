@@ -160,7 +160,7 @@ class GeneratorBot:
             self.user_sessions[user_id]["description"] = description
             self.user_sessions[user_id]["status"] = "code_generated"
             
-            # Send code preview (first 1000 chars)
+            # Send code preview (first 800 chars)
             code_preview = bot_code[:800] + "...\n\n[code truncated]" if len(bot_code) > 800 else bot_code
             
             preview_text = (
@@ -392,8 +392,8 @@ class GeneratorBot:
                 f"❌ Failed to stop bot '{bot_name}'."
             )
 
-async def main():
-    """Main entry point"""
+async def run_bot():
+    """Setup and run the bot"""
     try:
         # Validate configuration
         config.validate()
@@ -422,7 +422,7 @@ async def main():
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bot_instance.handle_description)
                 ],
                 STATE_REVIEW_CODE: [
-                    CallbackQueryHandler(bot_instance.handle_button)
+                    CallbackQueryHandler(bot_instance.handle_button, pattern="^(launch|save|cancel)")
                 ]
             },
             fallbacks=[]
@@ -438,27 +438,44 @@ async def main():
     
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        raise
     finally:
         # Cleanup
         try:
             executor.cleanup()
             generator.close()
+            logger.info("Cleanup completed")
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
 
-if __name__ == "__main__":
-    # Fix for Windows asyncio event loop issue in Python 3.10+
+def main():
+    """Main entry point with proper event loop setup"""
+    # Fix for Windows asyncio issues
     if sys.platform == 'win32':
+        # Use SelectorEventLoop on Windows for better stability
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        logger.info("Using WindowsSelectorEventLoopPolicy for Windows")
     
+    # Create new event loop and run
     try:
-        asyncio.run(main())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(run_bot())
     except RuntimeError as e:
         if "Cannot close a running event loop" in str(e):
-            logger.error("Event loop error detected. This is a known issue with Python 3.12 on Windows.")
-            logger.error("Please try again or update Python to latest version.")
+            logger.error("Event loop error detected")
+            logger.error("This might be due to conflicting event loops")
+            logger.error("Try: pip install --upgrade python-telegram-bot")
         else:
-            raise
+            logger.error(f"Runtime error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        raise
+    finally:
+        try:
+            loop.close()
+        except:
+            pass
+
+if __name__ == "__main__":
+    main()
