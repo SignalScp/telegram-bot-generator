@@ -2,15 +2,28 @@
 
 AI-powered Telegram bot generation and hosting platform. Create custom Telegram bots in seconds using natural language prompts!
 
-## Features
+## 🎯 Features
 
 - 🧠 **AI-Powered Bot Generation** - Generate Telegram bots from text descriptions using OnlySq API
 - 🚀 **Instant Deployment** - Automatically create, configure, and launch new bots
 - 📦 **Bot Management** - List, monitor, and control all generated bots
-- 🔌 **OpenAI-Compatible API** - Uses free OnlySq API with 40+ AI models
+- 🔌 **OpenAI-Compatible API** - Uses free OnlySq API with 40+ AI models (no API key needed!)
+- 🔓 **JSON Database** - All bot metadata stored locally in JSON file on your PC
 - 🧩 **Modular Architecture** - Easy to extend and customize
-- 🛡️ **Sandbox Execution** - Secure isolated execution of generated bots
-- 🎨 **Code Generation** - Intelligent bot code generation with error handling
+- 🛡️ **Secure Execution** - Generated code validation and security checks
+- 🎨 **Smart Code Generation** - Intelligent bot code generation with error handling
+
+## 🔐 Why No API Key?
+
+OnlySq provides a **free tier** that doesn't require an API key! You get instant access to:
+- GPT-4o
+- Claude 3.5 Sonnet
+- Gemini 2.5
+- DeepSeek-R1
+- Llama 4
+- And 35+ other models
+
+No registration, no API key, completely free.
 
 ## Quick Start
 
@@ -18,8 +31,7 @@ AI-powered Telegram bot generation and hosting platform. Create custom Telegram 
 
 - Python 3.8+
 - pip
-- Telegram Bot Token (for the generator bot)
-- OnlySq API Key (free at https://docs.onlysq.ru)
+- Telegram Bot Token (from [@BotFather](https://t.me/botfather))
 
 ### Installation
 
@@ -33,190 +45,299 @@ pip install -r requirements.txt
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env with your tokens
+# Edit .env with your Telegram bot token
 ```
 
 ### Configuration
 
-Create `.env` file:
+Edit `.env` file:
 
 ```env
-# Main Bot Token (the bot that generates other bots)
+# Get this from @BotFather on Telegram
 MAIN_BOT_TOKEN=your_main_bot_token_here
 
-# OnlySq API Configuration
-ONLYSQ_API_KEY=your_onlysq_api_key_here
+# OnlySq API (free tier - no key needed!)
 ONLYSQ_BASE_URL=https://api.onlysq.ru/v1
-ONLYSQ_MODEL=gpt-4o  # or any other available model
+ONLYSQ_MODEL=gpt-4o-mini
 
-# Optional: Bot hosting configuration
-BOT_PORT=8000
-BOT_WEBHOOK_URL=https://your-domain.com  # For webhook mode
+# Database will be created automatically
+DATABASE_FILE=bots_database.json
 ```
 
 ### Usage
-
-#### Running the Main Bot
 
 ```bash
 python main.py
 ```
 
-The generator bot will start and listen for commands:
+Then in Telegram:
 
-- `/start` - Show main menu
-- `/generate` - Generate a new bot from description
-- `/list` - List all running bots
-- `/stop <bot_name>` - Stop a specific bot
-- `/status` - Show all bots status
-
-#### Example: Generate a Bot
-
-Send to the bot:
 ```
-/generate
+/start       - Show welcome message
+/generate    - Create a new bot
+/list        - Show your bots
+/status      - Show detailed status
+/stop <name> - Stop a bot
+/stats       - Show database statistics
+/help        - Show help
 ```
 
-Then describe what you want:
+## How It Works
+
+### 1. Generate Bot
 ```
-Create a weather bot that fetches current weather for any city and 
-shows temperature, humidity, and wind speed in emoji format
+User: /generate
+Bot: "Describe your bot"
+User: "Create a weather bot that shows temperature and humidity"
 ```
 
-The bot will:
-1. Generate Python code using AI
-2. Validate the generated code
-3. Create bot configuration
-4. Launch the bot
-5. Report status and token
+### 2. AI Creates Code
+```
+BotGenerator (using OnlySq free tier):
+✓ Parse description
+✓ Generate Python code
+✓ Validate syntax
+✓ Save to database
+```
+
+### 3. Launch Bot
+```
+User: [clicks Launch]
+
+Executor:
+✓ Save code file
+✓ Create process
+✓ Update database
+✓ Bot is running!
+```
+
+### 4. Manage Bots
+```
+User: /list
+Bot shows all your bots with status
+
+User: /stop WeatherBot
+Bot gracefully terminates the bot
+```
+
+## Database Structure
+
+Your bots are stored in `bots_database.json` on your PC:
+
+```json
+{
+  "metadata": {
+    "version": "1.0",
+    "created_at": "2024-12-23T20:00:00",
+    "updated_at": "2024-12-23T20:15:00"
+  },
+  "bots": {
+    "a1b2c3d4": {
+      "bot_id": "a1b2c3d4",
+      "name": "WeatherBot",
+      "description": "Shows weather data",
+      "user_id": 123456789,
+      "status": "running",
+      "code_file": "generated_bots/bot_a1b2c3d4.py",
+      "code_length": 3847,
+      "created_at": "2024-12-23T20:00:00",
+      "updated_at": "2024-12-23T20:05:00"
+    }
+  }
+}
+```
+
+## Example Bot Descriptions
+
+### Weather Bot
+```
+Create a weather bot that:
+- Accepts city names from users
+- Shows temperature in °C and °F
+- Shows weather emoji (☀️ 🌧️ 🜋)
+- Shows humidity and wind speed
+- Keeps query history
+```
+
+### Joke Bot
+```
+Create a joke bot that:
+- Sends random jokes with /joke
+- Has joke categories
+- Tracks jokes per user
+- Shows statistics with /stats
+- Rates jokes you like/dislike
+```
+
+### Code Helper Bot
+```
+Create a Python code review bot that:
+- Takes code snippets
+- Suggests optimizations
+- Points out bugs
+- Explains complex code
+- Rates code quality
+```
 
 ## Architecture
 
 ```
+┌─────────────────┐
+│  Main Generator Bot │ (/generate, /list, /status)
+└────────┬────────┘
+         │
+    ┌─────────────────────┐
+    │  BotGenerator (OnlySq API)│
+    │  - Parse description    │
+    │  - Generate code         │
+    │  - Validate syntax       │
+    └────────┬───────────┘
+         │
+    ┌─────────────────────┐
+    │  JSONDatabase           │
+    │  - Store bot metadata    │
+    │  - Track status          │
+    │  - User bot association  │
+    └────────┬───────────┘
+         │
+    ┌─────────────────────┐
+    │  BotExecutor            │
+    │  - Launch processes      │
+    │  - Monitor bots          │
+    │  - Stop/terminate        │
+    └─────────────────────┘
+```
+
+## Project Structure
+
+```
 telegram-bot-generator/
-├── main.py                 # Main generator bot entry point
-├── config.py              # Configuration management
-├── bot_generator.py       # AI-powered bot code generation
-├── bot_executor.py        # Bot process management
-├── bot_templates.py       # Base templates for generated bots
+├── main.py                 # Main bot application
+├── config.py              # Configuration
+├── database.py            # JSON database manager
+├── bot_generator.py       # AI code generation
+├── bot_executor.py        # Bot process manager
+├── bot_templates.py       # Code templates
 ├── onlysq_client.py       # OnlySq API wrapper
-├── database.py            # Bot metadata storage
-├── utils.py               # Helper functions
-├── generated_bots/        # Storage for generated bot files
-│   └── bot_<timestamp>.py # Generated bot code
-└── requirements.txt       # Python dependencies
+├── utils.py               # Utilities
+├── generated_bots/        # Generated bot files
+├── bots_database.json     # Bot database (auto-created)
+├── requirements.txt       # Python dependencies
+├── .env.example          # Configuration template
+├── .gitignore            # Git ignore
+├── README.md             # This file
+├── INSTALLATION.md       # Setup guide
+├── USAGE.md              # Usage guide
+├── LICENSE               # MIT License
+└── PROJECT_SUMMARY.md    # Architecture overview
 ```
 
-## Core Components
+## Key Features
 
-### 1. Bot Generator (`bot_generator.py`)
-Uses OnlySq API with GPT-4o to generate bot code from natural language prompts.
+### 🔗 OnlySq Free API
+- No API key required
+- 40+ AI models
+- Free tier fully functional
+- Fast responses
 
-### 2. OnlySq Client (`onlysq_client.py`)
-Wrapper around OnlySq API for easy model access.
+### 📁 JSON Database
+- All data stored locally
+- No cloud dependencies
+- Easy backup (just copy the file)
+- Human-readable format
+- Database statistics
 
-### 3. Bot Executor (`bot_executor.py`)
-Manages bot lifecycle: spawn, monitor, terminate processes.
+### 🤠 User Management
+- Each user has their own bots
+- Isolated bot management
+- Per-user statistics
+- Private bot data
 
-### 4. Database (`database.py`)
-SQLite database for tracking generated bots metadata.
+### 💾 Bot Control
+- Create bots from descriptions
+- Save for later use
+- Launch with one click
+- Real-time status monitoring
+- Graceful shutdown
 
-## API Models Available
+## Commands Reference
 
-OnlySq API provides access to 40+ models:
-- GPT-4o
-- Claude 3.5 Sonnet
-- Gemini 2.5
-- DeepSeek-R1
-- Llama 4
-- Qwen3
-- And more...
+| Command | Description | Example |
+|---------|-------------|----------|
+| `/start` | Welcome message | `/start` |
+| `/generate` | Create new bot | `/generate` |
+| `/list` | Show your bots | `/list` |
+| `/status` | Detailed bot status | `/status` |
+| `/stop` | Stop a bot | `/stop WeatherBot` |
+| `/stats` | Database statistics | `/stats` |
+| `/help` | Show help | `/help` |
 
-## Examples
+## Requirements
 
-### Example 1: Music Bot
+- Python 3.8+
+- python-telegram-bot 21.1+
+- httpx
+- python-dotenv
+- Other dependencies in requirements.txt
 
-```
-/generate
-Create a music recommendation bot that:
-- Accepts artist names
-- Returns 5 similar artists
-- Shows album covers as emojis
-- Keeps conversation history
-```
+## Installation
 
-### Example 2: Code Helper Bot
+See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions.
 
-```
-/generate
-Create a Python code review bot that:
-- Takes code snippets
-- Provides optimization suggestions
-- Explains what the code does
-- Shows better approaches with examples
-```
+## Usage Guide
 
-## Limitations
+See [USAGE.md](USAGE.md) for examples and detailed usage.
 
-- Generated bots run on the same machine/process
-- Maximum concurrent bots limited by system resources
-- Generated code is sandboxed but untrusted code should be reviewed
-- Each bot requires unique token management
-
-## Advanced Usage
-
-### Custom Bot Templates
-
-Extend `bot_templates.py` to add custom base templates for specific bot types.
-
-### Integration with External APIs
-
-Generated bots can be configured to use external APIs (weather, crypto, etc.)
-
-### Webhook Mode
-
-Configure webhook URL in `.env` for production deployment instead of polling.
-
-## Security Considerations
+## Security
 
 ⚠️ **Important:**
-- Generated code from AI should be reviewed before production use
-- Implement rate limiting for bot generation
-- Validate all user inputs
-- Use strong API keys and tokens
-- Consider sandbox execution for untrusted prompts
+- Generated code is validated before execution
+- Dangerous imports are detected
+- Your bot tokens are not stored in the database
+- All data stays on your PC
+
+## Troubleshooting
+
+**Bot token not working?**
+- Verify it's correct from @BotFather
+- Check .env file has no spaces around `=`
+
+**OnlySq API not responding?**
+- Check internet connection
+- Verify `ONLYSQ_BASE_URL` is correct
+- Try again (API may be temporarily slow)
+
+**Database file corrupted?**
+- Delete `bots_database.json`
+- Restart the bot (it will recreate it)
 
 ## Contributing
 
-Contributions welcome! Areas for improvement:
-- Better error handling and validation
-- More sophisticated code generation
-- Bot versioning and rollback
-- Web dashboard for bot management
-- Kubernetes deployment support
-- Multi-language bot generation
+Contributions welcome!
 
 ## License
 
-MIT License - see LICENSE file
+MIT License - Free for personal and commercial use
 
 ## Support
 
-- 📧 Issues & Questions: GitHub Issues
-- 💬 Discussions: GitHub Discussions
-- 📱 Telegram: Join our community
+- 📧 GitHub Issues: Report bugs
+- 💬 GitHub Discussions: Ask questions
+- 📚 Documentation: Check README, USAGE, INSTALLATION
 
-## Roadmap
+## Future Enhancements
 
 - [ ] Web dashboard for bot management
 - [ ] Bot templates marketplace
-- [ ] Advanced code generation with tree search
-- [ ] Multi-language support
+- [ ] Multi-language bot generation
 - [ ] Docker containerization
 - [ ] Kubernetes deployment
-- [ ] Analytics and monitoring dashboard
-- [ ] Bot monetization framework
+- [ ] Advanced analytics
+- [ ] Bot versioning
+- [ ] Automated backups
 
 ---
 
 **Made with ❤️ by SignalScp**
+
+**Version:** 2.0 (JSON Database Edition)
