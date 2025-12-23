@@ -8,7 +8,6 @@ Before you start, make sure you have:
 - **pip** - Usually comes with Python
 - **git** - [Download here](https://git-scm.com/)
 - **Telegram Bot Token** - Get it from [@BotFather](https://t.me/botfather) on Telegram
-- **OnlySq API Key** - Get it free from [OnlySq Docs](https://docs.onlysq.ru/)
 
 ## Step-by-Step Installation
 
@@ -43,7 +42,7 @@ pip install -r requirements.txt
 
 This will install:
 - `python-telegram-bot` - Telegram bot framework
-- `openai` - For OnlySq API compatibility
+- `httpx` - HTTP client for OnlySq API
 - `python-dotenv` - Environment variable management
 - And other required packages
 
@@ -58,7 +57,7 @@ cp .env.example .env
 ```bash
 # On Windows
 echo. > .env
-# Edit with your text editor
+# Then edit with your text editor
 
 # On macOS/Linux
 nano .env
@@ -69,12 +68,12 @@ nano .env
 # Get this from @BotFather on Telegram
 MAIN_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
 
-# Get this from https://docs.onlysq.ru/
-ONLYSQ_API_KEY=YOUR_API_KEY_HERE
-
-# Keep these as default
+# OnlySq API (free tier - no API key needed!)
 ONLYSQ_BASE_URL=https://api.onlysq.ru/v1
-ONLYSQ_MODEL=gpt-4o
+ONLYSQ_MODEL=gpt-4o-mini
+
+# Database will be created automatically
+DATABASE_FILE=bots_database.json
 
 # Optional settings
 BOT_PORT=8000
@@ -85,15 +84,15 @@ LOG_LEVEL=INFO
 
 ```bash
 python -c "import telegram; print('✓ python-telegram-bot installed')"
-python -c "import openai; print('✓ openai installed')"
+python -c "import httpx; print('✓ httpx installed')"
 python -c "from dotenv import load_dotenv; print('✓ python-dotenv installed')"
 ```
 
 If all commands show checkmarks, you're ready to go!
 
-## Getting Required Tokens
+## Getting Telegram Bot Token
 
-### Telegram Bot Token
+### Step-by-Step
 
 1. Open Telegram and search for **@BotFather**
 2. Send `/start` command
@@ -103,12 +102,36 @@ If all commands show checkmarks, you're ready to go!
 6. Copy the token that BotFather gives you
 7. Paste it in `.env` as `MAIN_BOT_TOKEN`
 
-### OnlySq API Key
+**Token Format Example:**
+```
+1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
+```
 
-1. Visit [OnlySq Documentation](https://docs.onlysq.ru/)
-2. Sign up for a free account (if not already signed up)
-3. Get your API key from the dashboard
-4. Paste it in `.env` as `ONLYSQ_API_KEY`
+## Why No API Key?
+
+OnlySq provides a **completely free tier** that doesn't require:
+- ✅ API key registration
+- ✅ Credit card
+- ✅ Account creation
+- ✅ Any authentication
+
+Just use the free endpoint and you get access to 40+ AI models!
+
+## Database Setup
+
+The JSON database will be created automatically:
+
+```json
+bots_database.json  // Created on first run
+```
+
+This file stores:
+- All bot metadata
+- User-bot associations
+- Bot status information
+- Creation/modification timestamps
+
+**Note:** The database is stored locally on your PC - no cloud storage needed!
 
 ## Running the Application
 
@@ -121,14 +144,20 @@ python main.py
 You should see output like:
 ```
 2024-12-23 20:00:00,123 - root - INFO - Starting Telegram Bot Generator...
-2024-12-23 20:00:01,456 - root - INFO - Bot Generator started and ready to accept commands!
-2024-12-23 20:00:01,789 - root - INFO - Bot token: 1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk20...
+2024-12-23 20:00:00,456 - root - INFO - Database file: bots_database.json
+2024-12-23 20:00:01,789 - root - INFO - Bot Generator started and ready!
 ```
 
-### Option 2: With Logging
+### Option 2: With Logging to File
 
 ```bash
 python main.py > bot.log 2>&1 &
+```
+
+### Option 3: Using Python Module
+
+```bash
+python -m main
 ```
 
 ## Troubleshooting
@@ -140,27 +169,38 @@ python main.py > bot.log 2>&1 &
 pip install -r requirements.txt
 ```
 
+If that doesn't work, try:
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
 ### Error: "MAIN_BOT_TOKEN is required"
 
 **Solution:** Check your `.env` file:
-1. Make sure `.env` file exists
-2. Make sure you set `MAIN_BOT_TOKEN`
+1. Make sure `.env` file exists in the same folder as `main.py`
+2. Make sure you set `MAIN_BOT_TOKEN` (not `TELEGRAM_BOT_TOKEN`)
 3. Make sure token format is correct (numbers:letters)
-4. No spaces around the `=` sign
+4. Make sure no spaces around the `=` sign
 
-### Error: "ONLYSQ_API_KEY is required"
-
-**Solution:**
-1. Visit [OnlySq Docs](https://docs.onlysq.ru/)
-2. Get your API key
-3. Add it to `.env`
+**Example correct format:**
+```env
+MAIN_BOT_TOKEN=1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
+```
 
 ### Error: "Connection refused" or timeout
 
 **Solution:**
 1. Check your internet connection
 2. Check if OnlySq API is accessible: `ping api.onlysq.ru`
-3. Check if Telegram API is accessible
+3. Try again (API may be temporarily busy)
+
+### Error: "Database file corrupted"
+
+**Solution:**
+1. Delete `bots_database.json`
+2. Restart the bot
+3. Database will be recreated automatically
 
 ### Bot doesn't respond to commands
 
@@ -169,6 +209,7 @@ pip install -r requirements.txt
 2. In Telegram, send `/start` to your bot
 3. Check that `MAIN_BOT_TOKEN` is correct
 4. Look at console logs for errors
+5. Try restarting the bot
 
 ## Next Steps
 
@@ -179,21 +220,33 @@ pip install -r requirements.txt
    - Send `/generate` to create your first bot
    - Describe what bot you want in 1-2 sentences
 
-2. **View logs:**
+2. **Check the database:**
+   - Open `bots_database.json` with any text editor
+   - You'll see your bot metadata in JSON format
+
+3. **View logs:**
    - Watch console output for any errors
    - Generated bots are saved in `generated_bots/` directory
 
-3. **Advanced usage:**
-   - Check `README.md` for more commands
-   - Modify `bot_templates.py` for custom templates
-   - Extend `bot_generator.py` for better generation
+4. **Explore features:**
+   - Use `/list` to see all your bots
+   - Use `/status` for detailed information
+   - Use `/stats` to see database statistics
+
+## Deactivating Virtual Environment
+
+When you're done:
+
+```bash
+deactivate
+```
 
 ## Uninstallation
 
 To remove the project:
 
 ```bash
-# Deactivate virtual environment
+# Deactivate virtual environment first
 deactivate
 
 # Remove the directory
@@ -206,7 +259,7 @@ rmdir /s telegram-bot-generator
 ## Getting Help
 
 - **Issues:** Open an issue on GitHub
-- **Questions:** Check README.md first
+- **Questions:** Check README.md and USAGE.md first
 - **OnlySq Support:** Visit [OnlySq Community](https://t.me/onlysq)
 - **Telegram Bot Framework:** See [python-telegram-bot docs](https://python-telegram-bot.readthedocs.io/)
 
@@ -214,10 +267,32 @@ rmdir /s telegram-bot-generator
 
 1. **Start simple** - Begin with basic bot descriptions
 2. **Check logs** - Look at console output for errors
-3. **Test locally** - Make sure everything works before deploying
+3. **Test locally** - Make sure everything works before using
 4. **Use good descriptions** - More detailed = better generated code
-5. **Review generated code** - Check the generated code before using in production
+5. **Review generated code** - Check the code before production use
+6. **Backup database** - Keep copies of `bots_database.json`
+
+## System Requirements
+
+### Minimum
+- Python 3.8
+- 50MB free disk space
+- 256MB RAM
+- Internet connection
+
+### Recommended
+- Python 3.10+
+- 200MB free disk space
+- 512MB RAM
+- Fast internet connection
+
+## File Permissions
+
+Make sure the bot has permission to:
+- Read `.env` file
+- Write to current directory (for database and bot files)
+- Execute Python scripts
 
 ---
 
-**Happy bot generating! 🤖**
+**Ready to start? Run `python main.py`! 🚀**
