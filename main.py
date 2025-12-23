@@ -4,6 +4,8 @@
 import logging
 import os
 import uuid
+import asyncio
+import sys
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -441,9 +443,22 @@ async def main():
         raise
     finally:
         # Cleanup
-        executor.cleanup()
-        generator.close()
+        try:
+            executor.cleanup()
+            generator.close()
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    # Fix for Windows asyncio event loop issue in Python 3.10+
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    try:
+        asyncio.run(main())
+    except RuntimeError as e:
+        if "Cannot close a running event loop" in str(e):
+            logger.error("Event loop error detected. This is a known issue with Python 3.12 on Windows.")
+            logger.error("Please try again or update Python to latest version.")
+        else:
+            raise
